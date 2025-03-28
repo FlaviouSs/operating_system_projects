@@ -11,7 +11,7 @@ int main(int argc, char *argv[]){
     long unsigned bufferPtr_SIZE = 0;       // It's impossible to know the size of line in a file. So we declare the buffer as NULL and its size is 0
 
     if(argc == 1){                          // Checks if the user typed any file name
-        printf("wgrep: searchterm [file...]\n");
+        printf("wgrep: searchterm [file ...]\n");
         return 1;
     }
     else if(argc == 2){                     // Recive data via standart input
