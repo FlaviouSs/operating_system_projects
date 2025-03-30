@@ -9,35 +9,46 @@ int main (int argc, char *argv[]){
         return 1;
     }
 
+    //setbuf(stdout, NULL);
+
+    int match = 0;
+    char pivot_buffer = ' ';
+    char next_buffer;
+
     for(int k = 1; k < argc; k++){
 
         FILE *f = fopen(argv[k], "r");
 
-        int match = 0;
-        char pivot_buffer = ' ';
-        char next_buffer;
-        char *write_buffer = malloc(20);
-
-        pivot_buffer = fgetc(f);
-        match++;
-        if(pivot_buffer == EOF){
-            sprintf(write_buffer, "%d%c", match, pivot_buffer);
-            fwrite(write_buffer, strlen(write_buffer), 1, stdout);
-            fclose(f);
+        if(match == 0){
+            pivot_buffer = fgetc(f);
+            if (pivot_buffer == EOF) {
+                fclose(f);
+                continue;
+            }
+            match = 1;
         }
+
         while((next_buffer = fgetc(f)) != EOF){
-            if(pivot_buffer ==next_buffer){
+            if(pivot_buffer == next_buffer){
                 match++;
             }else{
-                sprintf(write_buffer, "%d%c", match, pivot_buffer);
-                fwrite(write_buffer,strlen(write_buffer), 1, stdout);
+                fwrite(&match, sizeof(int), 1, stdout);
+                fwrite(&pivot_buffer, sizeof(char), 1, stdout);
+                //fflush(stdout);
                 pivot_buffer = next_buffer;
                 match = 1;
             }
         }
 
+        fclose(f);
     }
 
+    if (match > 0) {
+        fwrite(&match, sizeof(int), 1, stdout);
+        fwrite(&pivot_buffer, sizeof(char), 1, stdout);
+        //fflush(stdout);
+    }
+    
 
     return 0;
 
