@@ -11,85 +11,42 @@ const char error_message[30] = "An error has occurred\n"; // Standart error mens
 const char *prompt_IM = "wish> "; // Prompt menssage for Interactive Mode
 const char *prompt_BM = "(wish> )"; // Prompt menssage for Batch Mode
 const char *exit_command = "exit"; // Exit Built-In command
-char *line = NULL; // Buffer to command line input
-char *command_args[MAX_ARGS];
 
-void clean_args(char *args[], int max);
+void logic_get_command_and_arguments(char *line, char *command_and_args[]);
+void logic_execute_command(char *command_and_args[]);
+void clean_command_and_args(char *args[], int max);
 
 int main(int argc, char *argv[]){
 
-    ssize_t nread; // Variable used to see te return value of getline()
-    size_t size = 0; // Variavle used to 
+    char *line = NULL;
+    char *command_args[MAX_ARGS];
 
-    if(argc > 1){ // Checks arguments to Batch Mode
+    ssize_t nread;
+    size_t size = 0;
 
-    }else{ // Starts ./wish in Interactive Mode
+    if(argc > 1){
+
+    }
+    else{
         while(1){
-            write(1, prompt_IM, strlen(prompt_IM)); // Writes 'wish> '
-            nread = getline(&line, &size, stdin); // Read command line
+            write(1, prompt_IM, strlen(prompt_IM));
+            nread = getline(&line, &size, stdin);
 
-            if (nread == -1){ // Checks if getline() fails
+            if (nread == -1){
                 write(1, error_message, sizeof(error_message));
                 exit(1);
             }
 
-            if (nread > 0 && line[nread - 1] == '\n') { // Checks if line ends with a break line, if yes, changes to \0
+            if (nread > 0 && line[nread - 1] == '\n') {
                 line[nread - 1] = '\0';
             }
 
-            if (strcmp(line, exit_command) == 0){ // Checks if user typed exit command
+            if (strcmp(line, exit_command) == 0){
                 break;
             }
             
-            char *token; // Variable to store the pieces of our line
-            char *command; // Varible to store the command of our line
-            char *line_copy = strdup(line); // Copy of our line
-
-            int k = 0;
-            while ((token = strsep(&line_copy, " ")) != NULL) { // We're breaking our line based on withespaces
-                if (*token == '\0') continue; // Ignores double whitespaces
-                if (k == 0) { // Getting the command
-                    command = token;
-                }
-                command_args[k++] = token; // Getting the arguments of the command
-            }
-            command_args[k] = NULL; // Command arry fineshes with NULL
-            free(line_copy); 
-
-            pid_t pid_filho = fork(); // Creates another process
-
-            if(pid_filho < 0){
-                write(1, error_message, sizeof(error_message));
-                exit(1);
-            }
-            else if(pid_filho == 0){
-                char *path = malloc(strlen("/bin/") + strlen(command) + 1); // Allocates memory to store the path of the command
-                strcpy(path, "/bin/");
-                strcat(path, command); // Stores command path to 'path'
-                int check = access(path, X_OK); // Checks process access permission to the path
-                
-                if(check == 0){ // If permission is given, executes
-                    execv(path, command_args);
-                }else{ // If permission is not given, tries the other path
-                    free(path);
-                    path = malloc(strlen("/usr/bin/") + strlen(command) + 1);
-                    strcpy(path, "/usr/bin/");
-                    strcat(path, command);
-                    int check = access(path, X_OK);
-
-                    if(check == 0){ // If permission is given, executes
-                        execv(path, command_args);
-                    }else{ // Error
-                        write(1, error_message, sizeof(error_message));
-                        exit(1);
-                    }
-                }
-                
-            }
-            else{
-                wait(NULL); // Wait for children process to finish
-                clean_args(command_args, MAX_ARGS); // Cleans command arguments array
-            }
+            logic_get_command_and_arguments(line, command_args);
+            logic_execute_command(command_args);
 
         }
         
@@ -98,7 +55,65 @@ int main(int argc, char *argv[]){
     return 0;
 }
 
-void clean_args(char *args[], int max){
+void logic_get_command_and_arguments(char *line, char *command_and_args[]){
+    char *token;
+    char *line_copy = strdup(line);
+
+    if(line_copy == NULL){
+        write(1, error_message, sizeof(error_message));
+        exit(1);
+    }
+
+    int k = 0;
+    while ((token = strsep(&line_copy, " ")) != NULL) {
+        if (*token == '\0') continue;
+        command_and_args[k++] = strdup(token);
+    }
+    command_and_args[k] = NULL;
+    free(line_copy); 
+
+}
+
+void logic_execute_command(char *command_and_args[]){
+    pid_t child_pid = fork();
+
+    if(child_pid < 0){
+        write(1, error_message, sizeof(error_message));
+        exit(1);
+    }
+    else if(child_pid == 0){
+        char *path = malloc(strlen("/bin/") + strlen(command_and_args[0]) + 1); 
+        strcpy(path, "/bin/");
+        strcat(path, command_and_args[0]);
+        
+        int check = access(path, X_OK);
+        
+        if(check == 0){
+            execv(path, command_and_args);
+        }else{
+            free(path);
+            
+            path = malloc(strlen("/usr/bin/") + strlen(command_and_args[0]) + 1);
+            strcpy(path, "/usr/bin/");
+            strcat(path, command_and_args[0]);
+            
+            int check = access(path, X_OK);
+
+            if(check == 0){
+                execv(path, command_and_args);
+            }else{ // Error
+                write(1, error_message, sizeof(error_message));
+                exit(1);
+            }
+        }
+    }
+    else{
+        wait(NULL);
+        clean_command_and_args(command_and_args, MAX_ARGS);
+    }
+}
+
+void clean_command_and_args(char *args[], int max){
     for (int i = 0; i < max; i++) {
         if (args[i] != NULL) {
             args[i] = NULL;
