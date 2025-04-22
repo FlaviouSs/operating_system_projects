@@ -27,6 +27,30 @@ int main(int argc, char *argv[]){
     size_t size = 0;
 
     if(argc > 1){
+        FILE *f = fopen(argv[1], "r");
+
+        if(!f){
+            write(2, error_message, strlen(error_message));
+            exit(1);
+        }
+
+        while((nread = getline(&line, &size, f)) != -1){
+
+            if (nread > 0 && line[nread - 1] == '\n') {
+                line[nread - 1] = '\0';
+            }
+    
+            if (strcmp(line, exit_command) == 0){
+                exit(0);
+            }
+
+            if(change_directory_command(line)) continue;
+
+            logic_get_command_and_arguments(line, command_args);
+            logic_execute_command(command_args);
+
+        }
+
 
     }
     else{
@@ -35,7 +59,7 @@ int main(int argc, char *argv[]){
             nread = getline(&line, &size, stdin);
 
             if (nread == -1){
-                write(1, error_message, sizeof(error_message));
+                write(2, error_message, strlen(error_message));
                 exit(1);
             }
 
@@ -64,7 +88,7 @@ void logic_get_command_and_arguments(char *line, char *command_and_args[]){
     char *line_copy = strdup(line);
 
     if(line_copy == NULL){
-        write(1, error_message, sizeof(error_message));
+        write(2, error_message, strlen(error_message));
         exit(1);
     }
 
@@ -82,7 +106,7 @@ void logic_execute_command(char *command_and_args[]){
     pid_t child_pid = fork();
 
     if(child_pid < 0){
-        write(1, error_message, sizeof(error_message));
+        write(2, error_message, strlen(error_message));
         exit(1);
     }
     else if(child_pid == 0){
@@ -106,7 +130,7 @@ void logic_execute_command(char *command_and_args[]){
             if(check == 0){
                 execv(path, command_and_args);
             }else{ // Error
-                write(1, error_message, sizeof(error_message));
+                write(2, error_message, strlen(error_message));
                 exit(1);
             }
         }
@@ -131,7 +155,7 @@ int change_directory_command(char *line){
     char *change_directory[3] = {NULL, NULL, NULL};
 
     if(line_copy == NULL){
-        write(1, error_message, sizeof(error_message));
+        write(2, error_message, strlen(error_message));
         exit(1);
     }
 
@@ -143,14 +167,14 @@ int change_directory_command(char *line){
     }
 
     if(strcmp(change_directory[0], cd_command) == 0){
-        if(change_directory[2] != NULL){
-            write(1, error_message, sizeof(error_message));
-            exit(1);
+        if(change_directory[2] != NULL || change_directory[1] == NULL){
+            write(2, error_message, strlen(error_message));
+            exit(0);
         }
         
         if(chdir(change_directory[1])){
-            write(1, error_message, sizeof(error_message));
-            exit(1);
+            write(2, error_message, strlen(error_message));
+            exit(0);
         }
 
         for(int i = 0; i < 3; i++){
