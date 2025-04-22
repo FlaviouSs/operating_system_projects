@@ -11,7 +11,9 @@ const char error_message[30] = "An error has occurred\n"; // Standart error mens
 const char *prompt_IM = "wish> "; // Prompt menssage for Interactive Mode
 const char *prompt_BM = "(wish> )"; // Prompt menssage for Batch Mode
 const char *exit_command = "exit"; // Exit Built-In command
+const char *cd_command = "cd"; // Change Directory Built-In command
 
+int change_directory_command(char *line);
 void logic_get_command_and_arguments(char *line, char *command_and_args[]);
 void logic_execute_command(char *command_and_args[]);
 void clean_command_and_args(char *args[], int max);
@@ -42,9 +44,11 @@ int main(int argc, char *argv[]){
             }
 
             if (strcmp(line, exit_command) == 0){
-                break;
+                exit(0);
             }
             
+            if(change_directory_command(line)) continue;
+
             logic_get_command_and_arguments(line, command_args);
             logic_execute_command(command_args);
 
@@ -119,4 +123,46 @@ void clean_command_and_args(char *args[], int max){
             args[i] = NULL;
         }
     }
+}
+
+int change_directory_command(char *line){
+    char *token;
+    char *line_copy = strdup(line);
+    char *change_directory[3] = {NULL, NULL, NULL};
+
+    if(line_copy == NULL){
+        write(1, error_message, sizeof(error_message));
+        exit(1);
+    }
+
+
+    int k = 0;
+    while ((token = strsep(&line_copy, " ")) != NULL) {
+        if (*token == '\0') continue;
+        change_directory[k++] = strdup(token);
+    }
+
+    if(strcmp(change_directory[0], cd_command) == 0){
+        if(change_directory[2] != NULL){
+            write(1, error_message, sizeof(error_message));
+            exit(1);
+        }
+        
+        if(chdir(change_directory[1])){
+            write(1, error_message, sizeof(error_message));
+            exit(1);
+        }
+
+        for(int i = 0; i < 3; i++){
+            if (change_directory[i] != NULL) {
+                free(change_directory[i]);
+            }
+        }
+
+        free(line_copy);
+        return 1;
+    }
+    
+    free(line_copy);
+    return 0;
 }
