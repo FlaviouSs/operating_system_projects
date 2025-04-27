@@ -14,6 +14,7 @@ char *parallel_commands[MAX_PARALLEL_COMMANDS] = {NULL};
 char *redirection[MAX_REDIRECTION_ACTIONS] = {NULL};
 char *command_and_arguments[TOTAL_ARGUMENTS_COMMAND] = {NULL};
 
+void get_command_arguments(char *command_and_arguments_line);
 void get_redirection_on_command(char *command_line);
 void get_parallel_commands(char *linePtr);
 char *trim(char *str);
@@ -42,16 +43,23 @@ int main (int argc, char *argv[]){
             }
 
             input_line[strcspn(input_line, "\n")] = '\0';
-
+            printf("B\n");
             get_parallel_commands(input_line);
             int j = 0;
-            while(parallel_commands[j] != NULL){
-                printf("Comando %d: %s\n", j, parallel_commands[j]);
+            while(parallel_commands[j] != NULL){;
+                printf("Comando %d: %s\n\n", j, parallel_commands[j]);
                 get_redirection_on_command(parallel_commands[j]);
                 printf("COMANDO e ARGS: %s\n", redirection[0]);
                 printf("REDIRECTION: %s\n", redirection[1]);
-                printf("PROVA REAL: %s\n", redirection[2]);
+                printf("PROVA REAL: %s\n\n", redirection[2]);
+                get_command_arguments(redirection[0]);
+                printf("COMANDO: %s\n", command_and_arguments[0]);
+                for(int k = 1; k < TOTAL_ARGUMENTS_COMMAND; k++){
+                    if(command_and_arguments[k] == NULL)continue;
+                    printf("ARGUMENTO %d: %s\t", k, command_and_arguments[k]);
+                }
                 j++;
+                printf("\n");
             }
 
         }
@@ -66,6 +74,31 @@ int main (int argc, char *argv[]){
 
     free(input_line);
     return 0;
+}
+
+void get_command_arguments(char *command_and_arguments_line){
+    
+    for (int i = 0; i < TOTAL_ARGUMENTS_COMMAND; i++) {
+        command_and_arguments[i] = NULL;
+    }
+
+    int count_arguments = 0;
+    char *copyLine = strdup(command_and_arguments_line);
+    char *cleanPtr = copyLine;
+
+    if(!copyLine){
+        write(STDERR_FILENO, error_message, strlen(error_message));
+        exit(1);
+    }
+
+    char *token;
+    while((token = strsep(&copyLine, " ")) != NULL){
+        if(*token == '\0') continue;
+        token = trim(token);
+        command_and_arguments[count_arguments++] = strdup(token);
+    }
+
+    free(cleanPtr);
 }
 
 void get_redirection_on_command(char *command_line){
