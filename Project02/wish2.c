@@ -5,7 +5,7 @@
 #include <ctype.h>
 
 #define MAX_PARALLEL_COMMANDS 30
-#define MAX_REDIRECTION_ACTIONS 5
+#define MAX_REDIRECTION_ACTIONS 10
 #define TOTAL_ARGUMENTS_COMMAND 30
 
 const char error_message[30] = "An error has occurred\n"; 
@@ -14,6 +14,7 @@ char *parallel_commands[MAX_PARALLEL_COMMANDS] = {NULL};
 char *redirection[MAX_REDIRECTION_ACTIONS] = {NULL};
 char *command_and_arguments[TOTAL_ARGUMENTS_COMMAND] = {NULL};
 
+void get_redirection_on_command(char *command_line);
 void get_parallel_commands(char *linePtr);
 char *trim(char *str);
 
@@ -42,14 +43,16 @@ int main (int argc, char *argv[]){
 
             input_line[strcspn(input_line, "\n")] = '\0';
 
-            printf("A\n");
             get_parallel_commands(input_line);
             int j = 0;
             while(parallel_commands[j] != NULL){
-                printf("B\n");
-                printf("Comando %d: %s\n", j, parallel_commands[j++]);
+                printf("Comando %d: %s\n", j, parallel_commands[j]);
+                get_redirection_on_command(parallel_commands[j]);
+                printf("COMANDO e ARGS: %s\n", redirection[0]);
+                printf("REDIRECTION: %s\n", redirection[1]);
+                printf("PROVA REAL: %s\n", redirection[2]);
+                j++;
             }
-            printf("C\n");
 
         }
         
@@ -63,6 +66,37 @@ int main (int argc, char *argv[]){
 
     free(input_line);
     return 0;
+}
+
+void get_redirection_on_command(char *command_line){
+    
+    for (int i = 0; i < MAX_REDIRECTION_ACTIONS; i++) {
+        redirection[i] = NULL;
+    }
+
+    int count_redirections = 0;
+    char *copyLine = strdup(command_line);
+    char *cleanPtr = copyLine;
+
+    if(!copyLine){
+        write(STDERR_FILENO, error_message, strlen(error_message));
+        exit(1);
+    }
+
+    char *token;
+    while((token = strsep(&copyLine, ">")) != NULL){
+        token = trim(token);
+        redirection[count_redirections++] = strdup(token);
+    }
+
+    for(int k = 2; k < MAX_REDIRECTION_ACTIONS; k++){
+        if(redirection[k] != NULL){
+            write(STDERR_FILENO, error_message, strlen(error_message));
+            exit(1);
+        }
+    }
+
+    free(cleanPtr);
 }
 
 void get_parallel_commands(char *linePtr){
