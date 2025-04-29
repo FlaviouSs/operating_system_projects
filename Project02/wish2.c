@@ -34,9 +34,83 @@ int main(int argc, char *argv[]) {
     char *input_line = NULL;
     size_t len = 0;
     ssize_t read;
+    FILE *batch_file = NULL;
 
     if (argc == 2) {
-        // Batch Mode: (não implementado ainda)
+
+        batch_file = fopen(argv[1], "r");
+        if (batch_file == NULL) {
+            write(STDERR_FILENO, error_message, strlen(error_message));
+            exit(1);
+        }
+        while ((read = getline(&input_line, &len, batch_file)) != -1) {
+            input_line[strcspn(input_line, "\n")] = '\0';
+            get_parallel_commands(input_line);
+
+            pid_t children_pids[MAX_PARALLEL_COMMANDS];
+            int num_commands = 0;
+
+            int j = 0;
+            while (parallel_commands[j] != NULL) {
+                get_redirection_on_command(parallel_commands[j]);
+                get_command_arguments(redirection[0]);
+
+                if (command_and_arguments[0] == NULL) {
+                    j++;
+                    continue;
+                }
+
+                if (strcmp(command_and_arguments[0], "exit") == 0) {
+                    if (command_and_arguments[1] != NULL) {
+                        write(STDERR_FILENO, error_message, strlen(error_message));
+                        break;
+                    }
+                    free(input_line);
+                    free(current_path);
+                    fclose(batch_file);
+                    exit(0);
+                }
+                else if (strcmp(command_and_arguments[0], "cd") == 0) {
+                    if (command_and_arguments[1] == NULL || command_and_arguments[2] != NULL) {
+                        write(STDERR_FILENO, error_message, strlen(error_message));
+                    } else {
+                        if (chdir(command_and_arguments[1]) != 0) {
+                            write(STDERR_FILENO, error_message, strlen(error_message));
+                        }
+                    }
+                    j++;
+                    continue;
+                }
+                else if (strcmp(command_and_arguments[0], "path") == 0) {
+                    set_path(command_and_arguments);
+                    j++;
+                    continue;
+                }
+
+                pid_t pid = fork();
+                if (pid == 0) {
+                    execute_command(command_and_arguments, redirection[1], current_path);
+
+                }
+                else if (pid > 0) {
+                    children_pids[num_commands++] = pid;
+                }
+                else {
+                    write(STDERR_FILENO, error_message, strlen(error_message));
+                    exit(1);
+                }
+
+                j++;
+            }
+
+            for (int i = 0; i < num_commands; i++) {
+                waitpid(children_pids[i], NULL, 0);
+            }
+        }
+        free(input_line);
+        free(current_path);
+        fclose(batch_file);
+        exit(0);
     }
     else if (argc == 1) {
         while (1) {
@@ -73,7 +147,7 @@ int main(int argc, char *argv[]) {
                 if (strcmp(command_and_arguments[0], "exit") == 0) {
                     if (command_and_arguments[1] != NULL) {
                         write(STDERR_FILENO, error_message, strlen(error_message));
-                        exit(1);
+                        break;
                     }
                     free(input_line);
                     free(current_path);
@@ -115,7 +189,6 @@ int main(int argc, char *argv[]) {
                 j++;
             }
 
-            // Espera todos os filhos terminarem
             for (int i = 0; i < num_commands; i++) {
                 waitpid(children_pids[i], NULL, 0);
             }
@@ -167,6 +240,7 @@ char *checkPath(const char *current_path, const char *command) {
 }
 
 void execute_command(char *command_and_arguments[], const char *redirection_file, const char *current_path) {
+
     if (redirection_file != NULL) {
         int fd = open(redirection_file, O_WRONLY | O_CREAT | O_TRUNC, 0666);
         if (fd < 0) {
@@ -233,7 +307,6 @@ void get_redirection_on_command(char *command_line) {
     for (int k = 2; k < MAX_REDIRECTION_ACTIONS; k++) {
         if (redirection[k] != NULL) {
             write(STDERR_FILENO, error_message, strlen(error_message));
-            exit(1);
         }
     }
 
