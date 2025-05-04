@@ -28,6 +28,8 @@ void get_parallel_commands(char *linePtr);
 char *trim(char *str);
 void set_path(char *args[]);
 
+int error_flag = 0;
+
 int main(int argc, char *argv[]) {
     current_path = strdup("/bin");  // Inicializes the path with "/bin"
 
@@ -51,6 +53,12 @@ int main(int argc, char *argv[]) {
             int num_commands = 0;
 
             int j = 0;
+
+            if(strncmp(input_line, "> ", 2) == 0){
+                write(STDERR_FILENO, error_message, strlen(error_message));
+                continue;
+            }
+
             while (parallel_commands[j] != NULL) {
                 get_redirection_on_command(parallel_commands[j]);
                 get_command_arguments(redirection[0]);
@@ -90,7 +98,6 @@ int main(int argc, char *argv[]) {
                 pid_t pid = fork();
                 if (pid == 0) {
                     execute_command(command_and_arguments, redirection[1], current_path);
-
                 }
                 else if (pid > 0) {
                     children_pids[num_commands++] = pid;
@@ -124,6 +131,11 @@ int main(int argc, char *argv[]) {
 
             // Removes the newline character from the end of the string and replaces it with a null terminator
             input_line[strcspn(input_line, "\n")] = '\0';
+
+            if(strncmp(input_line, "> ", 2) == 0){
+                write(STDERR_FILENO, error_message, strlen(error_message));
+                continue;
+            }
 
             get_parallel_commands(input_line);
 
@@ -189,6 +201,7 @@ int main(int argc, char *argv[]) {
                 j++;
             }
 
+            // Espera todos os filhos terminarem
             for (int i = 0; i < num_commands; i++) {
                 waitpid(children_pids[i], NULL, 0);
             }
@@ -240,26 +253,50 @@ char *checkPath(const char *current_path, const char *command) {
 }
 
 void execute_command(char *command_and_arguments[], const char *redirection_file, const char *current_path) {
-
     if (redirection_file != NULL) {
-        int fd = open(redirection_file, O_WRONLY | O_CREAT | O_TRUNC, 0666);
-        if (fd < 0) {
-            write(STDERR_FILENO, error_message, strlen(error_message));
-            exit(1);
+        
+        int i = 0;
+        char *copyRedirection = strdup(redirection_file);
+        char *cleanPtr = copyRedirection;
+        char *token;
+        while((token = strsep(&copyRedirection, " "))){
+            if(i == 0){
+                i++;
+            }else{
+                if(strlen(token) > 0){
+                    write(STDERR_FILENO, error_message, strlen(error_message));
+                    free(cleanPtr);
+                    error_flag = 1;
+                }
+            }
         }
-        dup2(fd, STDOUT_FILENO);
-        dup2(fd, STDERR_FILENO);
-        close(fd);
+        
+
+        if(error_flag == 0){
+            int fd = open(redirection_file, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+            if (fd < 0) {
+                write(STDERR_FILENO, error_message, strlen(error_message));
+                exit(1);
+            }
+
+            dup2(fd, STDOUT_FILENO);
+            dup2(fd, STDERR_FILENO);
+            close(fd);
+            free(cleanPtr);
+        }
+
     }
 
-    char *path = checkPath(current_path, command_and_arguments[0]);
-    if (path != NULL) {
-        execv(path, command_and_arguments);
-    }
+    if(error_flag != 1){
+        char *path = checkPath(current_path, command_and_arguments[0]);
+        if (path != NULL) {
+            execv(path, command_and_arguments);
+        }
 
-    // Se não encontrar o comando
-    write(STDERR_FILENO, error_message, strlen(error_message));
-    exit(1);
+        // Se não encontrar o comando
+        write(STDERR_FILENO, error_message, strlen(error_message));
+        exit(1);
+    }
 }
 
 void get_command_arguments(char *command_and_arguments_line) {
@@ -307,6 +344,7 @@ void get_redirection_on_command(char *command_line) {
     for (int k = 2; k < MAX_REDIRECTION_ACTIONS; k++) {
         if (redirection[k] != NULL) {
             write(STDERR_FILENO, error_message, strlen(error_message));
+            break;
         }
     }
 
